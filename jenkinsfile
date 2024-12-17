@@ -1,0 +1,60 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('Echo') {
+            steps {
+                echo 'echo principal'
+            }
+        }
+        
+        stage('GetCode') {
+            steps {
+                git 'https://github.com/sant8pool/CP1'
+                bat 'dir'
+                bat 'set PYTHONPATH=%WORKSPACE%'
+            }
+        }    
+        
+        stage('Build') {
+             steps {
+                 echo ' '
+            }
+        }
+        
+        stage('Test') {
+            parallel {
+                stage('Unit') {
+                    steps {
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                            bat '''
+                                set PYTHONPATH=%WORKSPACE%
+                                pytest --junitxml=result-unit.xml test\\unit
+                            '''
+                        }
+                    }
+                }    
+                    
+                stage('Service') {
+                    steps {
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                            bat '''
+                                set FLASK_APP=app\\api.py
+                                start flask run
+                                start java -jar C:\\Users\\Mikel\\UNIR\\wiremock-standalone-3.10.0.jar --port 9090 --root-dir C:\\Users\\Mikel\\UNIR\\CP1-A\\helloworld\\test\\wiremock
+                                set PYTHONPATH=%WORKSPACE%
+                                pytest --junitxml=result-rest.xml test\\rest
+                            '''  
+                        }    
+                    }
+                }    
+            }
+        }
+        
+        stage ('Results') {
+            steps {
+                junit 'result*.xml'
+            }
+        }
+    }
+}    
