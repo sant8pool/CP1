@@ -55,12 +55,12 @@ class TestCalculate(unittest.TestCase):
         self.assertRaises(TypeError, self.calc.power, "0", 0)
         
     def test_subtract_method_returns_correct_result(self):
-        self.assertEqual(4, self.calc.substract(10, 6))
-        self.assertEqual(-2, self.calc.substract(256, 258))
-        self.assertEqual(-1, self.calc.substract(-1, 0))
-        self.assertEqual(0, self.calc.substract(0, 0))
-        self.assertEqual(0, self.calc.substract(0, 0))
-        self.assertRaises(TypeError, self.calc.substract, "0", 0)
+        self.assertEqual(4, self.calc.subtract(10, 6))
+        self.assertEqual(-2, self.calc.subtract(256, 258))
+        self.assertEqual(-1, self.calc.subtract(-1, 0))
+        self.assertEqual(0, self.calc.subtract(0, 0))
+        self.assertEqual(0, self.calc.subtract(0, 0))
+        self.assertRaises(TypeError, self.calc.subtract, "0", 0)
         
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
