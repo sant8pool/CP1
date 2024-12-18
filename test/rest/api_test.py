@@ -56,13 +56,13 @@ class TestApi(unittest.TestCase):
         )
 
     def test_api_divide(self):
-        url = f"{BASE_URL}/calc/divide/10/2"
+        url = f"{BASE_URL}/calc/divide/8/2"
         response = urlopen(url, timeout=DEFAULT_TIMEOUT)
         self.assertEqual(
             response.status, http.client.OK, f"Error en la petición API a {url}"
         )
         self.assertEqual(
-            response.read().decode(), "5", "ERROR DIVIDE"
+            response.read().decode(), "4", "ERROR DIVIDE"
         )
 
 
