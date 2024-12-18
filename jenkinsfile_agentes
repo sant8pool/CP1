@@ -1,0 +1,73 @@
+pipeline {
+    agent none
+    
+    stages {
+        stage('Echo') {
+            steps {
+                echo 'echo principal'
+            }
+        }
+        
+        stage('GetCode') {
+            agent { label '' }
+            steps {
+                
+                git 'https://github.com/sant8pool/CP1'
+                bat 'dir'
+                stash includes: '**', name: 'codigo'
+                bat 'whoami'
+                bat 'hostname'
+            }
+        }    
+        
+        stage('Build') {
+            agent { label '' }
+            steps {
+                 echo ' '
+            }
+        }
+        
+        stage('Unit') {
+            agent { label 'unit' }
+            steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                    unstash 'codigo'
+                    bat '''
+                    whoami
+                    hostname
+                    dir
+                    set PYTHONPATH=%WORKSPACE%
+                    pytest --junitxml=result-unit.xml test\\unit
+                '''
+            }
+        }
+        
+    }    
+                    
+        stage('Service') {
+            agent { label 'rest' }
+            steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                    unstash 'codigo'
+                    bat '''
+                        whoami
+                        hostname
+                        dir
+                        set FLASK_APP=app\\api.py
+                        start flask run
+                        start java -jar C:\\Users\\Mikel\\UNIR\\wiremock-standalone-3.10.0.jar --port 9090 --root-dir C:\\Users\\Mikel\\UNIR\\CP1-A\\helloworld\\test\\wiremock
+                        pytest --junitxml=result-rest.xml test\\rest
+                    '''  
+                }    
+            }
+        }    
+        
+        stage ('Results') {
+            agent { label '' }
+            steps {
+                junit 'result*.xml'
+            }
+        }
+        
+    }
+}    
