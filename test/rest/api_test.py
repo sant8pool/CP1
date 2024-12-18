@@ -26,13 +26,13 @@ class TestApi(unittest.TestCase):
         )
 
     def test_api_subtract(self):
-        url = f"{BASE_URL}/calc/subtract/7/2"
+        url = f"{BASE_URL}/calc/subtract/4/2"
         response = urlopen(url, timeout=DEFAULT_TIMEOUT)
         self.assertEqual(
             response.status, http.client.OK, f"Error en la petición API a {url}"
         )
         self.assertEqual(
-            response.read().decode(), "5", "ERROR SUBTRACT"
+            response.read().decode(), "2", "ERROR SUBTRACT"
         )
 
     def test_api_sqrt(self):
