@@ -1,73 +1,102 @@
 pipeline {
-    agent none
-    
+    agent any
+
     stages {
-        stage('Echo') {
-            steps {
-                echo 'echo principal'
-            }
-        }
-        
         stage('GetCode') {
-            agent { label '' }
+            agent { label 'python' } // Compartido con Unit y Coverage
             steps {
-                
                 git 'https://github.com/sant8pool/CP1'
                 bat 'dir'
-                stash includes: '**', name: 'codigo'
+                bat 'set PYTHONPATH=%WORKSPACE%'
                 bat 'whoami'
                 bat 'hostname'
-            }
-        }    
-        
-        stage('Build') {
-            agent { label '' }
-            steps {
-                 echo ' '
+                bat 'echo %WORKSPACE%'
+                stash name:'code', includes:'**'
             }
         }
-        
-        stage('Unit') {
-            agent { label 'unit' }
+
+        stage('Tests') {
+            parallel {
+                stage('Unit') {
+                    agent { label 'python' } // Mismo agente que GetCode y Coverage
+                    steps {
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                            bat '''
+                                whoami
+                                hostname
+                                echo %WORKSPACE%
+                                set PYTHONPATH=%WORKSPACE%
+                                coverage run --branch --source=app --omit=app\\__init__.py,app\\api.py -m pytest test\\unit
+                                coverage xml
+                            '''
+                        }
+                    }
+                }
+
+                stage('Static') {
+                    agent { label 'codigo' } // Compartido con Security
+                    steps {
+                        bat 'whoami'
+                        bat 'hostname'
+                        bat 'echo %WORKSPACE%'
+                        bat 'flake8 --exit-zero --format=pylint app >flake8.out'
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                            recordIssues tools: [flake8(name: 'Flake8', pattern: 'flake8.out')], qualityGates: [[threshold: 8, type: 'TOTAL', unstable: true], [threshold: 10, type: 'TOTAL', unstable: false]]
+                        }
+                    }
+                }
+
+                stage('Security') {
+                    agent { label 'codigo' } // Mismo agente que Static
+                    steps {
+                        unstash name:'code'
+                        bat 'whoami'
+                        bat 'hostname'
+                        bat 'echo %WORKSPACE%'
+                        bat 'bandit --exit-zero -r . -f custom -o bandit.out --msg-template "{abspath}:{line}: [{test_id}] {msg}"'
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                            recordIssues tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold: 2, type: 'TOTAL', unstable: true], [threshold: 4, type: 'TOTAL', unstable: false]]
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Coverage') {
+            agent { label 'python' } // Mismo agente que GetCode y Unit
             steps {
+                bat 'dir'
+                bat 'whoami'
+                bat 'hostname'
+                bat 'echo %WORKSPACE%'
                 catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-                    unstash 'codigo'
-                    bat '''
+                    
+                    cobertura coberturaReportFile: 'coverage.xml', failNoReports: false, conditionalCoverageTargets: '100,0,85', lineCoverageTargets: '100,0,95'
+                }
+            }
+        }
+
+        stage('Performance') {
+            agent { label 'rendimiento' } // Agente separado para JMeter
+            steps {
+                bat '''
                     whoami
                     hostname
-                    dir
-                    set PYTHONPATH=%WORKSPACE%
-                    pytest --junitxml=result-unit.xml test\\unit
+                    echo %WORKSPACE%
+                    set FLASK_APP=app\\api.py
+                    start flask run
+                    C:\\Users\\Mikel\\UNIR\\apache-jmeter-5.6.3\\bin\\jmeter -n -t C:\\Users\\Mikel\\UNIR\\apache-jmeter-5.6.3\\bin\\Test1.jmx -f -l flask.jtl
                 '''
+                perfReport sourceDataFiles: 'flask.jtl'
             }
         }
-        
-    }    
-                    
-        stage('Service') {
-            agent { label 'rest' }
-            steps {
-                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-                    unstash 'codigo'
-                    bat '''
-                        whoami
-                        hostname
-                        dir
-                        set FLASK_APP=app\\api.py
-                        start flask run
-                        start java -jar C:\\Users\\Mikel\\UNIR\\wiremock-standalone-3.10.0.jar --port 9090 --root-dir C:\\Users\\Mikel\\UNIR\\CP1-A\\helloworld\\test\\wiremock
-                        pytest --junitxml=result-rest.xml test\\rest
-                    '''  
-                }    
-            }
-        }    
-        
-        stage ('Results') {
-            agent { label '' }
-            steps {
-                junit 'result*.xml'
-            }
-        }
-        
     }
-}    
+    post {
+        always {
+            script {
+                // Limpia el workspace después de la ejecución del pipeline
+                deleteDir()
+            }
+        }
+    }
+}
